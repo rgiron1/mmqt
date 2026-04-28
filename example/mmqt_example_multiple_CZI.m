@@ -13,9 +13,9 @@ function mmqt_example_multiple_CZI()
 directory_main = 'enter_here_the_path_to_the_main_data_folder';
 % e.g.: directory_main = '/Volumes/Local/microglia/data_czi/'; %--- this folder should contain the folder "/mouse_CB51"
 
-%--- find the CZI-files, included in subfolder of the main folder, using glob
-fnamesCZI = glob([directory_main, '/*/*.czi']);
-fprintf('Found following CZI-files:\n')
+%--- find the CZI and ND2 files, included in subfolder of the main folder, using glob
+fnamesCZI = [glob([directory_main, '/*/*.czi']); glob([directory_main, '/*/*.nd2'])];
+fprintf('Found following image files:\n')
 disp(fnamesCZI)
 
 %% specify parameters for visualization
