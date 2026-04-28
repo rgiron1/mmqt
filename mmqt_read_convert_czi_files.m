@@ -2,22 +2,24 @@ function [fnamesCZI, fnamesMat, metadata] = mmqt_read_convert_czi_files(inCZI, s
 % function [fnamesCZI, fnamesMat, metadata] = mmqt_read_convert_czi_files(dirCZI, summary, depth, orderChannels, figureScaling, figureHide)
 % function [fnamesCZI, fnamesMat, metadata] = mmqt_read_convert_czi_files(fnameCZI, summary, depth, orderChannels, figureScaling, figureHide)
 %
-% Read Carl Zeiss Image (CZI) file, containing two color channels:
+% Read microscopy image file (CZI or ND2), containing two color channels:
 %   1. Layer: DAPI staining of nuclei
 %   2. Layer: anti-Iba1 steining of microglia
 %   (see also argument "orderChannels")
-% In particularly, this script reads the the image data and the meta-data from the CZI-File.
+% In particularly, this script reads the the image data and the meta-data from the image file.
 % The image data will be converted into a 4D array. It saves the 4D matrix together with information
 % about image size, image scaling and other meta-information into a Matlab (.mat) File, with the suffix "_stack1_raw.mat".
-% The script will check if the found CZI-File have already been converted previously and skip them in this case.
+% The script will check if the found image files have already been converted previously and skip them in this case.
+%
+% Supported file formats: .czi (Carl Zeiss Image), .nd2 (Nikon NIS-Elements)
 %
 % Input arguments:
-%   fnameCZI        - path-name to single CZI-File, to be converted
-%   dirCZI          - path-name to folder in which the CZI-File(s) are located
-%   summary         - logical, indicating whether to show only the summary of the newly found CZI files. 
-%                       If false, then in addition to the summary, newly found CZI files will be read and converted.
+%   fnameCZI        - path-name to single image file (CZI or ND2), to be converted
+%   dirCZI          - path-name to folder in which the image file(s) are located
+%   summary         - logical, indicating whether to show only the summary of the newly found image files.
+%                       If false, then in addition to the summary, newly found image files will be read and converted.
 %                       (optional; defaults to summary=false)
-%   depth           - number, indicating the search depth relative to the directory containing the CZI-files (i.e. dirCZI), as specified in file 'microglia_project_setup.m'
+%   depth           - number, indicating the search depth relative to the directory containing the image files (i.e. dirCZI), as specified in file 'microglia_project_setup.m'
 %                       If depth=0, all levels below dirCZI will be
 %                       searchd.
 %                       (optional; defaults to depth=1)
@@ -25,18 +27,18 @@ function [fnamesCZI, fnamesMat, metadata] = mmqt_read_convert_czi_files(inCZI, s
 %                       The order of channels should correspond to:
 %                           1. DAPI
 %                           2. anti-Iba
-%                       If this is not the case, flip channels after reading from CZI-file, using this argument.
-%                       Example: 
+%                       If this is not the case, flip channels after reading from the image file, using this argument.
+%                       Example:
 %                       If orderChannels=[2 1]; then the second color channel will become the first in the 4D matrix and vice versa
 %                       If orderChannels=[], the order will not be changed
-%                       IF orderChannels=[1 2], the order will not be changed, but if there was a third layer in the CZI, this layer will be removed
+%                       IF orderChannels=[1 2], the order will not be changed, but if there was a third layer, this layer will be removed
 %                       (optional; defaults to orderChannels=[])
-%   figureScaling   - 
+%   figureScaling   -
 %
 % Output arguments:
-%   fnamesCZI       - path-names of the found CZI-files; if input was a single CZI-file, then the input is returned unchanged
+%   fnamesCZI       - path-names of the found image files; if input was a single file, then the input is returned unchanged
 %   fnamesMat       - path-names of the created MAT-Files with image data (cell array of character vectors)
-%   metadata        - meta-data read from the CZI-File(s), in table format
+%   metadata        - meta-data read from the image file(s), in table format
 
 %% declare default values for unspecified or empty variables
 varNames = {'summary', 'depth', 'orderChannels', 'figureScaling', 'figureHide'};
@@ -47,7 +49,7 @@ for i=1:length(varNames)
     end
 end
 
-%% add Bio-Formats toolbox to the path (needed to read .czi files)
+%% add Bio-Formats toolbox to the path (needed to read .czi and .nd2 files)
 if ~exist('bfopen', 'file')
     %--- specify an absolute path to bfmatalb
     path_bfmatlab = '/Volumes/Local/Matlab/bfmatlab';
@@ -78,12 +80,12 @@ else
 end
 
 
-%% search source folder for .czi files
+%% search source folder for .czi and .nd2 files
 %--- define search depth relative to dirCZI
 if exist('dirCZI', 'var')
     if ~exist('depth','var') || ~isnumeric(depth)
         depth=1;
-        fprintf('- NOTE: Search depth for CZI-files has been set to 1!\n')
+        fprintf('- NOTE: Search depth for image files has been set to 1!\n')
     end
     if depth<=0
         depth = [filesep, '**', filesep];
@@ -91,13 +93,13 @@ if exist('dirCZI', 'var')
         depth = depth-1;
         depth = [filesep, repmat(['*' filesep],1,depth)];
     end
-    %--- search CZI files
-    fnamesCZI = glob([dirCZI, depth, '*.czi']);
+    %--- search CZI and ND2 files
+    fnamesCZI = [glob([dirCZI, depth, '*.czi']); glob([dirCZI, depth, '*.nd2'])];
     if isempty(fnamesCZI)
-        error('Input directory does not contain any CZI File at the specified search depth')
+        error('Input directory does not contain any CZI or ND2 files at the specified search depth')
     else
         %--- display file list
-        fprintf('\nFound %g .czi files:\n', length(fnamesCZI))
+        fprintf('\nFound %g image files (.czi/.nd2):\n', length(fnamesCZI))
         fprintf('  %s\n',fnamesCZI{:})
         nCZI = length(fnamesCZI);
         fprintf('(n=%d)\n\n', nCZI)
@@ -123,7 +125,7 @@ end
 
 %% Summarize (only if input was a directory)
 if exist('dirCZI', 'var')
-    fprintf('\nNewly detected CZI files:\n')
+    fprintf('\nNewly detected image files:\n')
     fprintf('  %s\n', fnamesCZI{:})
     fprintf('\nSummary:\n')
     fprintf('N=%d files were found overall\n', nCZI)
@@ -162,7 +164,7 @@ for iFn=1:length(fnamesCZI)
     data = bfopen(fnamesCZI{iFn});
     %% Extract meta data, if possible
     try
-        %% get metadata from CZI into a cell array, which we call "metaPairs"
+        %% get metadata from image file into a cell array, which we call "metaPairs"
         metaCZI = data{1, 2};
         metaCZI_iterator = metaCZI.keySet().iterator();
         metaPairs = cell(metaCZI.size(),2);
@@ -171,7 +173,7 @@ for iFn=1:length(fnamesCZI)
             metaPairs{i,2} = metaCZI.get(metaPairs{i,1});
             % fprintf('%s = %s\n', pairs{i,:})
         end
-        %% extract desired meta-data from CZI (extract wanted keys)
+        %% extract desired meta-data from image file (extract wanted keys)
         keyWanted = {'Size[XYZC]','Scaling[XYZ]','Objective.*Model','PinholeDiameter','LaserPower'}; %,'Wavelength'};
         idx = [];
         metaPairsWanted = cell(0,2);
